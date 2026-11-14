@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+async function moduleFor(file){const b=await build({entryPoints:[file],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(b.outputFiles[0].text).toString('base64'))}
+const body=await moduleFor('lib/request-body.ts');
+assert.deepEqual(body.byteRange('bytes=2-5',10),{offset:2,length:4,end:5});
+assert.deepEqual(body.byteRange('bytes=-3',10),{offset:7,length:3,end:9});
+for(const r of ['bytes=10-','bytes=6-2','bytes=0-1,3-4','bytes=-0'])assert.throws(()=>body.byteRange(r,10));
+for(const text of ['null','[]','"text"','{'])await assert.rejects(body.boundedJson(new Request('https://test.local',{method:'POST',body:text})));
+await assert.rejects(body.boundedJson(new Request('https://test.local',{method:'POST',body:JSON.stringify({q:'a'.repeat(100)})}),50),body.BodyLimitError);
+assert.throws(()=>body.objectData('[]'));assert.throws(()=>body.objectData('null'));assert.throws(()=>body.objectData(JSON.stringify({q:'x'.repeat(70001)})),body.BodyLimitError);
+const vault=await moduleFor('lib/key-vault.ts');
+const secret=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64');
+const input={key:'test-only-fake-api-key-value',model:'test-model',consent:true,updatedAt:Date.now()};
+const raw=await vault.sealSettings(input,'account:owner-a',secret);
+assert(!raw.includes(input.key));assert.deepEqual(await vault.openSettings(raw,'account:owner-a',secret),input);
+await assert.rejects(vault.openSettings(raw,'account:owner-b',secret));
+const tampered=JSON.parse(raw);tampered.ciphertext='AAAA'+tampered.ciphertext.slice(4);await assert.rejects(vault.openSettings(JSON.stringify(tampered),'account:owner-a',secret));
+const one=await vault.vaultOwner(new Request('https://test.local'));const two=await vault.vaultOwner(new Request('https://test.local'));assert.notEqual(one.owner,two.owner);assert(one.cookie.includes('HttpOnly; Secure; SameSite=Strict'));
+const company=await moduleFor('lib/company-research.ts');
+const candidate={url:'https://example.co.jp/partner/',title:'パートナー募集 | テスト制作株式会社',raw_content:('テスト制作株式会社はWebサイト制作の外部パートナーを募集しています。').repeat(20)};
+const firm=company.researchCompanyResult(candidate,{region:'東京都'});assert(firm);assert.equal(firm.region,'募集元で確認');assert.equal(firm.searchRegion,'東京都');
+console.log('Audit checks passed: byte ranges, invalid/oversized JSON, encrypted API key isolation, tamper rejection, distinct secure guest identities, unverified company-region handling.');

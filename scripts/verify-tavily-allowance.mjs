@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync} from 'node:fs';
+const load=async(file)=>{const b=await build({entryPoints:[file],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(b.outputFiles[0].text).toString('base64'))};
+const {freeTavilyCredits,authorizeTavily}=await load('lib/tavily-allowance.ts');
+const {fetchTavilyAction}=await load('lib/tavily-confirmation.ts');
+const database=new DatabaseSync(':memory:');database.exec(readFileSync('drizzle/0002_simple_young_avengers.sql','utf8'));
+const db={prepare(sql){let args=[];return {bind(...v){args=v;return this},async run(){return {meta:{changes:Number(database.prepare(sql).run(...args).changes)}}}}}};
+const usage=(used=0,extra={})=>({key:{usage:0,limit:999999},account:{current_plan:'Researcher',plan_usage:used,plan_limit:1000,paygo_usage:0,...extra}});
+assert.equal(freeTavilyCredits(usage(998)),2);
+assert.equal(freeTavilyCredits(usage(1000)),0);
+for(const data of [{key:{usage:0,limit:1000}},usage(0,{current_plan:'Bootstrap',plan_limit:15000}),usage(0,{plan_usage:'0'}),usage(0,{paygo_usage:1}),usage(0,{paygo_usage:undefined})])assert.equal(freeTavilyCredits(data),null);
+let usageCalls=0;
+const options={key:'fixture-only',db,initiated:true,credits:2,request:async(url,init)=>{assert.equal(url,'https://api.tavily.com/usage');assert(!init.body);usageCalls++;return Response.json(usage(998))}};
+await assert.rejects(()=>authorizeTavily({...options,initiated:false}),e=>e.code==='TAVILY_ACTION_REQUIRED');assert.equal(usageCalls,0);
+const permit=await authorizeTavily(options);assert.equal(permit.freeCreditsBefore,2);
+await assert.rejects(()=>authorizeTavily(options),e=>e.code==='TAVILY_ACTION_BUSY');assert.equal(usageCalls,1);
+await permit.release();
+for(const data of [usage(999),usage(1000),{},usage(0,{current_plan:'Project'})])await assert.rejects(()=>authorizeTavily({...options,request:async()=>Response.json(data)}),e=>e.status===402&&e.code==='TAVILY_CONFIRMATION_REQUIRED');
+await assert.rejects(()=>authorizeTavily({...options,request:async()=>{throw Error('offline')}}),e=>e.status===402);
+await assert.rejects(()=>authorizeTavily({...options,request:async()=>new Response('',{status:401})}),e=>e.status===400&&e.code==='TAVILY_INVALID_KEY');
+const reset=await authorizeTavily({...options,request:async()=>Response.json(usage(0))});assert.equal(reset.freeCreditsBefore,1000);await reset.release();
+const lastCredit=await authorizeTavily({...options,minimumCredits:1,request:async()=>Response.json(usage(999))});assert.equal(lastCredit.credits,1);await lastCredit.release();
+const again=await authorizeTavily(options);await again.release();
+const paid=await authorizeTavily({...options,confirmed:true,request:async()=>{throw Error('Do not gate confirmed paid action on usage')}});assert.equal(paid.freeCreditsBefore,null);
+
+const originalFetch=globalThis.fetch,originalWindow=globalThis.window;
+try{
+ let sends=[],prompts=0,accept=false,needsConfirmation=false;
+ globalThis.window={confirm(){prompts++;return accept}};
+ globalThis.fetch=async(url,init)=>{const body=JSON.parse(init.body);sends.push(body);return needsConfirmation&&!body.confirmed?Response.json({code:'TAVILY_CONFIRMATION_REQUIRED',error:'残り0クレジット'},{status:402}):Response.json({jobs:[],credits:2})};
+ const action=()=>({label:'案件検索',credits:2,details:'検索条件を送信'});
+ assert.equal(sends.length,0);
+ assert.equal((await fetchTavilyAction('/api/website-jobs',{conditions:{q:'React'}},action())).status,200);assert.equal(prompts,0);assert.equal(sends.length,1);assert.equal(sends[0].confirmed,false);assert.equal(sends[0].initiated,true);
+ needsConfirmation=true;sends=[];
+ await assert.rejects(()=>fetchTavilyAction('/api/website-jobs',{},action()),/キャンセル/);assert.equal(sends.length,1);assert.equal(prompts,1);
+ sends=[];accept=true;const batch=action();await fetchTavilyAction('/api/website-jobs',{},batch);assert.deepEqual(sends.map(s=>s.confirmed),[false,true]);assert.equal(prompts,2);
+ sends=[];await fetchTavilyAction('/api/website-jobs',{},batch);assert.equal(sends.length,1);assert.equal(prompts,2);
+ const controller=new AbortController();controller.abort();prompts=0;
+ await assert.rejects(()=>fetchTavilyAction('/api/website-jobs',{},action(),controller.signal),e=>e.name==='AbortError');assert.equal(prompts,0);
+ globalThis.fetch=async()=>Response.json({error:'一時的な障害'},{status:502});assert.equal((await fetchTavilyAction('/api/website-jobs',{},action())).status,502);assert.equal(prompts,0);
+}finally{globalThis.fetch=originalFetch;globalThis.window=originalWindow}
+console.log('Allowance fixtures passed: official account credits, 998/999/1000 boundary, unknown/paid/offline fallback, same-key concurrency, release after failure, no prompt within free credits, cancellation sends no search, confirmed action only, no automatic provider retry. No real credits used.');
