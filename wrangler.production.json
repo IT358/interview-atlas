@@ -1,0 +1,17 @@
+{
+  "$comment": "Template only. Do not deploy this file. Run: npm run build:production → dist/server/wrangler.production.json. Set ATLAS_D1_DATABASE_ID for a real D1 id. Put SHARE_ACCESS_TOKEN and USER_KEY_ENCRYPTION_KEY in Wrangler Secrets, never here.",
+  "name": "interview-atlas",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "OWNER_BILLING_APPROVED": "0"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "interview-atlas-db",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

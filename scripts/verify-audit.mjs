@@ -16,7 +16,14 @@ assert(!raw.includes(input.key));assert.deepEqual(await vault.openSettings(raw,'
 await assert.rejects(vault.openSettings(raw,'account:owner-b',secret));
 const tampered=JSON.parse(raw);tampered.ciphertext='AAAA'+tampered.ciphertext.slice(4);await assert.rejects(vault.openSettings(JSON.stringify(tampered),'account:owner-a',secret));
 const one=await vault.vaultOwner(new Request('https://test.local'));const two=await vault.vaultOwner(new Request('https://test.local'));assert.notEqual(one.owner,two.owner);assert(one.cookie.includes('HttpOnly; Secure; SameSite=Strict'));
+const {DatabaseSync}=await import('node:sqlite');const fs=await import('node:fs');
+const mem=new DatabaseSync(':memory:');mem.exec(fs.readFileSync('drizzle/0003_r2_free_key_vault.sql','utf8'));
+const d1={prepare(sql){let args=[];return {bind(...v){args=v;return this},async first(){return mem.prepare(sql).get(...args)||null},async run(){const result=mem.prepare(sql).run(...args);return {meta:{changes:Number(result.changes)}}}}}};
+await vault.writeSettings(d1,{owner:one.owner},input,secret);
+assert.deepEqual(await vault.readSettings(d1,{owner:one.owner,guest:true},secret),input);
+assert.equal(await vault.readSettings(d1,{owner:two.owner,guest:true},secret),null);
+mem.close();
 const company=await moduleFor('lib/company-research.ts');
 const candidate={url:'https://example.co.jp/partner/',title:'パートナー募集 | テスト制作株式会社',raw_content:('テスト制作株式会社はWebサイト制作の外部パートナーを募集しています。').repeat(20)};
-const firm=company.researchCompanyResult(candidate,{region:'東京都'});assert(firm);assert.equal(firm.region,'募集元で確認');assert.equal(firm.searchRegion,'東京都');
-console.log('Audit checks passed: byte ranges, invalid/oversized JSON, encrypted API key isolation, tamper rejection, distinct secure guest identities, unverified company-region handling.');
+const firm=company.researchCompanyResult(candidate,{region:'東京都'});assert(firm);assert.equal(firm.region,'所在地は公式で確認');assert.equal(firm.searchRegion,'東京都');
+console.log('Audit checks passed: byte ranges, invalid/oversized JSON, encrypted API key isolation, D1 guest isolation, tamper rejection, distinct secure guest identities, unverified company-region handling.');

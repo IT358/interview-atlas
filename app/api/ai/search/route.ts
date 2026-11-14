@@ -9,7 +9,7 @@ const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Co
 export async function POST(req:Request){
  if(FREE_TEST_MODE)return costLockResponse();
  if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'不正なアクセス'},403);
- try{const data=await boundedJson(req,12000);const user=await getChatGPTUser();const id=await vaultOwner(req,user?.userId);const saved=(env as any).USER_KEY_ENCRYPTION_KEY?await readSettings(env.BUCKET!,id,(env as any).USER_KEY_ENCRYPTION_KEY):null;
+ try{const data=await boundedJson(req,12000);const user=await getChatGPTUser();const id=await vaultOwner(req,user?.userId);const saved=(env as any).USER_KEY_ENCRYPTION_KEY&&env.DB?await readSettings(env.DB,id,(env as any).USER_KEY_ENCRYPTION_KEY):null;
  const key=String(data.key||saved?.key||'');if(!key)return reply({error:'「設定・連携」でAPIキーを保存してください。'},400);
  if(key.length>512)return reply({error:'APIキーを確認してください。'},400);
  // An unsaved key is only used after explicit client consent; persisted keys carry saved consent.

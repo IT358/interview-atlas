@@ -12,7 +12,7 @@ export async function POST(req:Request){
  if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'不正なアクセス'},403);
  let permit:TavilyPermit|undefined;
  try{const data=await boundedJson(req,12000);if(data.initiated!==true&&data.confirmed!==true)return reply({error:'検索ボタンを押してから実行してください。'},400);const user=await getChatGPTUser();const identity=await vaultOwner(req,user?.userId);const secret=(env as any).USER_KEY_ENCRYPTION_KEY;
- const saved=secret?await readSettings(env.BUCKET!,{...identity,owner:'tavily:'+identity.owner},secret):null;
+ const saved=secret&&env.DB?await readSettings(env.DB,{...identity,owner:'tavily:'+identity.owner},secret):null;
  if(!saved?.key||!saved.consent)return reply({error:'「設定・連携」でTavilyのAPIキーと送信への同意を保存してください。'},400);
  const conditions={...emptySearch};for(const field of Object.keys(conditions) as (keyof typeof conditions)[])conditions[field]=String(data.conditions?.[field]||'').slice(0,500);
  permit=await authorizeTavily({key:saved.key,db:env.DB,initiated:data.initiated,confirmed:data.confirmed,credits:1,env:env as any});

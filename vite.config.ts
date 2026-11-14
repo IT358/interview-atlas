@@ -1,6 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { configureToolEnvironment } from "./scripts/tool-environment.mjs";
 import { sites } from "./scripts/vite/sites-vite-plugin";
@@ -9,6 +10,19 @@ import { connectorPreview } from "./scripts/vite/connector-preview-plugin.mjs";
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
+/** Independent production build: no .openai/hosting.json, no R2. */
+const productionBuild = process.env.ATLAS_PRODUCTION_BUILD === "1";
+
+function loadSitesHostingBindings(): { d1?: string; r2?: string | null } {
+  if (productionBuild) return { d1: "DB", r2: null };
+  const hostingPath = fileURLToPath(new URL("./.openai/hosting.json", import.meta.url));
+  if (!existsSync(hostingPath)) {
+    throw new Error("Missing .openai/hosting.json for local/Sites build.");
+  }
+  return JSON.parse(readFileSync(hostingPath, "utf8"));
+}
+
+const hostingConfig = loadSitesHostingBindings();
 const { d1, r2 } = hostingConfig;
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
@@ -22,19 +36,21 @@ const localBindingConfig = {
     ? [
         {
           binding: d1,
-          database_name: "site-creator-d1",
+          database_name: productionBuild ? "interview-atlas-db" : "site-creator-d1",
           database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
         },
       ]
     : [],
-  r2_buckets: r2
-    ? [
-        {
-          binding: r2,
-          bucket_name: "site-creator-r2",
-        },
-      ]
-    : [],
+  // Production independent deploy stays R2-free.
+  r2_buckets:
+    !productionBuild && r2
+      ? [
+          {
+            binding: r2,
+            bucket_name: "site-creator-r2",
+          },
+        ]
+      : [],
 };
 
 export default defineConfig(async ({ command }) => {
@@ -55,13 +71,13 @@ export default defineConfig(async ({ command }) => {
     plugins: [
       vinext(),
       sites({ mockAuth: !managedLinux }),
-      connectorPreview(),
+      ...(productionBuild ? [] : [connectorPreview()]),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
         config: {
           ...localBindingConfig,
-          ...(command === "serve"
+          ...(!productionBuild && command === "serve"
             ? {
                 services: [
                   {
@@ -73,7 +89,7 @@ export default defineConfig(async ({ command }) => {
               }
             : {}),
         },
-        ...(command === "serve"
+        ...(!productionBuild && command === "serve"
           ? {
               auxiliaryWorkers: [
                 {

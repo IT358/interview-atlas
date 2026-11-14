@@ -33,5 +33,5 @@ writeFileSync('.share-invite.local.txt',[
  'This file is local-only. Do not commit or send the raw token alone.',
 ].join('\n')+'\n',{mode:0o600});
 console.log('共有トークンを .dev.vars に用意しました（値は表示しません）。');
-console.log('次: Cloudflare無料アカウントで Workers / D1 / R2 を用意し、Paidに上げずデプロイします。');
+console.log('次: Cloudflare無料アカウントで Workers / D1 を用意し、Paidに上げずデプロイします（R2なし可）。');
 console.log('招待URLの形は .share-invite.local.txt を見てください。');

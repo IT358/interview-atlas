@@ -1,15 +1,15 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
-import { requestHasShareAccess, shareCookieHeader, shareEnabled, shareGateHtml, shareToken } from "../lib/share-access";
+import { requestHasShareAccess, shareCookieHeader, shareGateActive, shareGateHtml, shareToken } from "../lib/share-access";
 
 const worker = {
   fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
-    if (shareEnabled(env as any) && !requestHasShareAccess(request, env as any)) {
+    if (shareGateActive(env as any) && !requestHasShareAccess(request, env as any)) {
       const url = new URL(request.url);
       const access = url.searchParams.get("access") || "";
       const expected = shareToken(env as any);
-      if (access && access === expected) {
+      if (expected && access && access === expected) {
         url.searchParams.delete("access");
         return new Response(null, {
           status: 302,

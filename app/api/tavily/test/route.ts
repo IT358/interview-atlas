@@ -13,7 +13,7 @@ export async function POST(req:Request){
   const data=await boundedJson(req,2000);
   if((data.initiated!==true&&data.confirmed!==true)||typeof data.requestId!=='string'||!/^[-a-f0-9]{36}$/.test(data.requestId))return reply({error:'接続テストのボタンを押して実行してください。'},400);
   const user=await getChatGPTUser();const identity=await vaultOwner(req,user?.userId);cookie=identity.cookie;const secret=(env as any).USER_KEY_ENCRYPTION_KEY;
-  const saved=secret?await readSettings(env.BUCKET!,{...identity,owner:'tavily:'+identity.owner},secret):null;
+  const saved=secret&&env.DB?await readSettings(env.DB,{...identity,owner:'tavily:'+identity.owner},secret):null;
   if(!saved?.key||!saved.consent)return reply({error:'先にステップ3で、ご自身のTavilyキーを保存してください。'},400,cookie);
   permit=await authorizeTavily({key:saved.key,db:env.DB,initiated:data.initiated,confirmed:data.confirmed,credits:1,env:env as any});
   const db=env.DB!,now=Date.now();

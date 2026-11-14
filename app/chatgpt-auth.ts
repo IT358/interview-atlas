@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { env } from "cloudflare:workers";
 
 export type ChatGPTUser = {
   userId: string;
@@ -18,7 +19,16 @@ const SIGN_IN_PATH = "/signin-with-chatgpt";
 const SIGN_OUT_PATH = "/signout-with-chatgpt";
 const CALLBACK_PATH = "/callback";
 
+/** Independent Cloudflare Workers must leave TRUST_SITES_AUTH_HEADERS unset. Spoofable oai-* headers are ignored unless Sites explicitly enables trust. */
+export function sitesAuthHeadersTrusted(
+  runtime: { TRUST_SITES_AUTH_HEADERS?: string } | null | undefined = env as any,
+) {
+  return String(runtime?.TRUST_SITES_AUTH_HEADERS || "").trim() === "1";
+}
+
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
+  if (!sitesAuthHeadersTrusted()) return null;
+
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);

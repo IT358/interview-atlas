@@ -2,8 +2,14 @@ export const SHARE_COOKIE='atlas-share';
 const timingSafeEqual=(a:string,b:string)=>{if(a.length!==b.length)return false;let out=0;for(let i=0;i<a.length;i++)out|=a.charCodeAt(i)^b.charCodeAt(i);return out===0};
 export function shareToken(env?:{SHARE_ACCESS_TOKEN?:string}|null){return String(env?.SHARE_ACCESS_TOKEN||'').trim()}
 export function shareEnabled(env?:{SHARE_ACCESS_TOKEN?:string}|null){return shareToken(env).length>=16}
+/** Production always gates; local/dev only gates when a token is configured. */
+export function shareGateActive(env?:{SHARE_ACCESS_TOKEN?:string}|null){
+ if(import.meta.env.PROD)return true;
+ return shareEnabled(env);
+}
 export function requestHasShareAccess(req:Request,env?:{SHARE_ACCESS_TOKEN?:string}|null){
- const expected=shareToken(env);if(!expected)return true;
+ const expected=shareToken(env);
+ if(!expected||expected.length<16)return false;
  const cookie=req.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(SHARE_COOKIE+'='))?.slice(SHARE_COOKIE.length+1)||'';
  const query=new URL(req.url).searchParams.get('access')||'';
  return timingSafeEqual(decodeURIComponent(cookie),expected)||timingSafeEqual(query,expected);
