@@ -18,13 +18,28 @@ export default function WebsiteJobs({tavilyReady,onSettings,onSave}:{tavilyReady
  const [catalog,setCatalog]=useState<any[]>([]),[jobs,setJobs]=useState<any[]>([]),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[message,setMessage]=useState('確認済み案件を読み込んでいます…'),[diagnostics,setDiagnostics]=useState<any>(null);
  const [action,setAction]=useState(''),[savedConditions,setSavedConditions]=useState<any>(null),[selected,setSelected]=useState(''),[saving,setSaving]=useState(''),[savedUrls,setSavedUrls]=useState<string[]>([]);
  const abort=useRef<AbortController|null>(null),revision=useRef(0);
+ const [handoffReady,setHandoffReady]=useState(false);
  useEffect(()=>{
-  let live=true;const current=revision.current;const ctl=new AbortController();
-  try{const saved=JSON.parse(localStorage.getItem('atlas-search-preset')||'null');if(saved)setSavedConditions(saved);const reload=(performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type==='reload';if(reload)sessionStorage.removeItem('atlas-website-return');else{const back=JSON.parse(sessionStorage.getItem('atlas-website-return')||'null');sessionStorage.removeItem('atlas-website-return');if(back?.conditions){setConditions({...initial,...back.conditions});setMode(back.mode==='web'?'web':'live')}}}catch{}
+  let live=true;const current=revision.current;const ctl=new AbortController();let fromTavily=false;
+  try{const saved=JSON.parse(localStorage.getItem('atlas-search-preset')||'null');if(saved)setSavedConditions(saved);const reload=(performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type==='reload';if(reload){sessionStorage.removeItem('atlas-website-return');sessionStorage.removeItem('atlas-tavily-handoff')}else{const back=JSON.parse(sessionStorage.getItem('atlas-website-return')||'null');sessionStorage.removeItem('atlas-website-return');if(back?.conditions){setConditions({...initial,...back.conditions});setMode(back.mode==='web'?'web':'live')}const handoff=JSON.parse(sessionStorage.getItem('atlas-tavily-handoff')||'null');sessionStorage.removeItem('atlas-tavily-handoff');if(handoff?.focus){fromTavily=true;setMode(handoff.mode==='web'?'web':'live');setHandoffReady(true);setMessage('Tavily接続完了。職種・地域を選んで「検索を開始します」を押してください。')}}}catch{}
   setHydrated(true);
-  fetch('/api/website-jobs?cat=Web制作全般',{signal:ctl.signal}).then(async r=>{const d:any=await r.json();if(!r.ok)throw Error(d.error||'案件を読み込めませんでした。');if(!live)return;setCatalog(d.jobs||[]);if(current===revision.current){setJobs(d.jobs||[]);setMessage(d.jobs?.length?`Web制作 ${d.jobs.length}件を表示中（日本・海外の取得対応サイト）。職種を選び、検索ボタンで最新の募集を探せます。`:'職種を選び、検索ボタンで募集を確認してください。')}}).catch(e=>{if(live&&e.name!=='AbortError')setMessage(e.message||'案件を読み込めませんでした。')}).finally(()=>{if(live)setLoading(false)});
+  fetch('/api/website-jobs?cat=Web制作全般',{signal:ctl.signal}).then(async r=>{const d:any=await r.json();if(!r.ok)throw Error(d.error||'案件を読み込めませんでした。');if(!live)return;setCatalog(d.jobs||[]);if(current===revision.current){setJobs(d.jobs||[]);if(!fromTavily)setMessage(d.jobs?.length?`Web制作 ${d.jobs.length}件を表示中（日本・海外の取得対応サイト）。職種を選び、検索ボタンで最新の募集を探せます。`:'職種を選び、検索ボタンで募集を確認してください。')}}).catch(e=>{if(live&&e.name!=='AbortError')setMessage(e.message||'案件を読み込めませんでした。')}).finally(()=>{if(live)setLoading(false)});
   return()=>{live=false;ctl.abort();revision.current++;abort.current?.abort()};
  },[]);
+ useEffect(()=>{
+  if(!handoffReady||!hydrated)return;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const target=document.getElementById('website-search-handoff')||document.getElementById('website-search-composer');
+  const form=document.getElementById('website-search-composer');
+  const input=document.getElementById('website-keyword') as HTMLInputElement|null;
+  const timer=window.setTimeout(()=>{
+   target?.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});
+   form?.classList.add('search-composer-ready');
+   input?.focus({preventScroll:true});
+   window.setTimeout(()=>form?.classList.remove('search-composer-ready'),1800);
+  },reduce?0:120);
+  return()=>window.clearTimeout(timer);
+ },[handoffReady,hydrated]);
  const shown=filterWebsiteJobs(appliedMode==='researched'?catalog:jobs,applied),dirty=JSON.stringify(conditions)!==JSON.stringify(applied);
  const role=professionForCategory(conditions.cat),skillOptions=role?.skills||[...new Set(professions.filter(p=>professionFamilies.find(f=>f.category===conditions.cat)?.id===p.family).flatMap(p=>p.skills))];
  function invalidate(){revision.current++;abort.current?.abort();setBusy(false);setAction('')}
@@ -51,9 +66,10 @@ export default function WebsiteJobs({tavilyReady,onSettings,onSave}:{tavilyReady
  async function save(j:any){setSaving(j.url);try{await onSave(j);setSavedUrls(u=>[...new Set([...u,j.url])]);setMessage('保存・応募管理に追加しました。')}catch(e:any){setMessage(e.message||'保存できませんでした。')}finally{setSaving('')}}
  return <div className="website-workspace profession-workspace">
   <div className="explore-intro"><div><span className="tiny-label">FIND YOUR NEXT PROJECT</span><h1>得意なことを、<br className="mobile"/>次の仕事に。</h1><p>Web制作からAI開発、デザイン、マーケティングまで。<br className="desktop-break"/>必要な条件で、実際の募集を探せます。</p></div><div className="explore-facts"><span><b>29</b>職種</span><span><Globe2 size={17}/>日本から、世界へ</span></div></div>
+  <div id="website-search-handoff">
   <div className="quick-presets" aria-label="よく使う職種"><span>すぐ探す</span>{[['WordPress','WordPress制作・修正'],['AI・自動化','AI・自動化全般'],['Webライター','Webライティング'],['QAテスター','QA・テスト']].map(([label,cat])=><button type="button" key={cat} aria-pressed={conditions.cat===cat} onClick={()=>change('cat',cat)}>{label}</button>)}{savedConditions&&<button type="button" aria-pressed={action==='preset'} onClick={()=>{invalidate();setConditions({...initial,...savedConditions});setAction('preset')}}><Bookmark size={13}/> 保存した条件</button>}</div>
-  <form className="panel hub-filters search-composer" onSubmit={e=>load(false,e)}><fieldset className="search-controls" disabled={!hydrated}>
-   <div className="composer-heading"><span><Search size={19}/>案件を検索</span><small>入力した条件は、検索ボタンで反映</small></div>
+  <form id="website-search-composer" className={'panel hub-filters search-composer'+(handoffReady?' search-composer-arrive':'')} onSubmit={e=>load(false,e)}><fieldset className="search-controls" disabled={!hydrated}>
+   <div className="composer-heading"><span><Search size={19}/>案件を検索</span><small>{handoffReady?'条件を選んで、すぐ検索できます':'入力した条件は、検索ボタンで反映'}</small></div>
    <div className="search-line"><div><label htmlFor="website-keyword">検索語 <small>任意</small></label><input id="website-keyword" value={conditions.q} onChange={e=>change('q',e.target.value)} maxLength={300} placeholder="例：React、英日翻訳、Instagram、RAG"/></div><button className="primary search-go" data-active={action==='search'&&(!dirty||busy)} aria-busy={busy} disabled={busy}><Search size={19}/>{busy?'募集を確認中…':'検索を開始します'}</button></div>
    <ProfessionPicker value={conditions.cat} onChange={v=>change('cat',v)}/>
    <div className="search-basics"><div><label htmlFor="website-market">地域</label><select id="website-market" value={conditions.market} onChange={e=>change('market',e.target.value)}><option value="">日本・海外</option><option value="日本">日本</option><option value="海外">海外</option></select></div><div><label htmlFor="website-source">掲載元</label><select id="website-source" value={conditions.source} onChange={e=>change('source',e.target.value)}><option value="">取得対応サイトすべて</option>{(mode==='web'?['クラウドワークス','ココナラ','ランサーズ','クラウディア']:directSiteNames.filter(name=>!conditions.market||freelanceSites.find(s=>s.name===name)?.market===conditions.market)).map(name=><option key={name}>{name}</option>)}</select></div><div><label htmlFor="website-mode">検索方法</label><select id="website-mode" value={mode} onChange={e=>switchMode(e.target.value)}><option value="live">APIキー不要</option><option value="web">Tavilyで追加検索</option><option value="researched">読み込み済みの結果</option></select></div></div>
@@ -62,6 +78,7 @@ export default function WebsiteJobs({tavilyReady,onSettings,onSave}:{tavilyReady
    {mode==='web'&&<div className="api-inline"><p>「検索を開始します」を押したときだけ実行。日本はクラウドワークス・ランサーズ・ココナラ・クラウディアの個別募集（詳細）ページを職種・検索語で探します。地域が「日本・海外」のときは Freelancer.com を公式API（クレジット消費なし）で補完します。一覧ページは対象外。最大2回・2クレジット。無料残量が足りる間は確認なし、不足・残量不明の場合だけこの端末で確認します。{!tavilyReady&&' APIキーの設定が必要です。'}</p><div className="actions"><button type="submit" className="primary search-start" data-active={action==='search'&&(!dirty||busy)} aria-busy={busy} disabled={busy}><Search size={15}/>{busy?'募集を確認中…':'検索を開始します'}</button><button type="button" className="secondary" onClick={settings}>Tavilyの設定へ<ArrowUpRight size={15}/></button></div></div>}
    {mode==='live'&&<div className="api-inline"><p>APIキー不要の自動取得はクラウドワークス・ココナラ・クラウディア・Freelancer.com。ランサーズは「Tavilyで追加検索」。@SOHO・Wantedly・エージェント系などは下の掲載元一覧から公式・外部検索へ。</p></div>}
   </fieldset></form>
+  </div>
   <div className="search-status"><ShieldCheck size={17}/><p className="search-feedback" role="status">{message}</p></div>
   <div className="results-toolbar" id="website-results"><div><span className="tiny-label">SEARCH RESULTS</span><h2>{scopeLabel(applied.cat)}<strong>{shown.length}</strong><small>件</small></h2></div><select aria-label="確認済み案件の並べ替え" value={applied.sort} onChange={e=>setApplied(c=>({...c,sort:e.target.value}))}><option value="new">新着順</option><option value="deadline">期限が近い順</option><option value="salary">通貨・報酬単位別に高い順</option></select></div>
   <div className="result-context"><p>{[applied.market||'日本・海外',applied.source||'複数サイト',applied.q&&'「'+applied.q+'」'].filter(Boolean).join(' / ')}{dirty&&<b>条件は未反映です</b>}</p><button type="button" className="text-button" disabled={busy} onClick={()=>load(true)}>募集元を再確認<RotateCcw size={13}/></button></div>

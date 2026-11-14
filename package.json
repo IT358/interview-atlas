@@ -13,6 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "setup:local": "node scripts/setup-local.mjs",
+    "prepare:url-share": "node scripts/prepare-url-share.mjs",
     "check:types": "tsc --noEmit --incremental false",
     "check:tavily": "node scripts/verify-tavily-allowance.mjs && node scripts/verify-tavily-search-consent.mjs && node scripts/verify-tavily-test-route.mjs"
   },

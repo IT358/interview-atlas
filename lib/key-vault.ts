@@ -2,12 +2,15 @@ export type AiSettings={key:string;model:string;consent:boolean;updatedAt:number
 export const GUEST_COOKIE='__Host-atlas-guest';
 const enc=new TextEncoder();const dec=new TextDecoder();
 function b64(bytes:Uint8Array){return btoa(String.fromCharCode(...bytes))}
-function unb64(s:string){return Uint8Array.from(atob(s),v=>v.charCodeAt(0))}
+function unb64(s:string){const normalized=s.replace(/-/g,'+').replace(/_/g,'/');const padded=normalized+'='.repeat((4-normalized.length%4)%4);return Uint8Array.from(atob(padded),v=>v.charCodeAt(0))}
 export async function vaultOwner(req:Request,userId?:string|null){
  if(userId)return {owner:'account:'+userId,guest:false,cookie:''};
- const old=req.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(GUEST_COOKIE+'='))?.slice(GUEST_COOKIE.length+1);
+ const secure=new URL(req.url).protocol==='https:';
+ const cookieName=secure?GUEST_COOKIE:'atlas-guest';
+ const old=req.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(cookieName+'=')||v.startsWith(GUEST_COOKIE+'='))?.split('=')[1];
  const token=old&&/^[a-f0-9]{64}$/.test(old)?old:[...crypto.getRandomValues(new Uint8Array(32))].map(x=>x.toString(16).padStart(2,'0')).join('');
- return {owner:'guest:'+token,guest:true,cookie:old===token?'':`${GUEST_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=15552000`};
+ const cookie=old===token?'':secure?`${GUEST_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=15552000`:`${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=15552000`;
+ return {owner:'guest:'+token,guest:true,cookie};
 }
 export async function vaultPath(owner:string){const hash=await crypto.subtle.digest('SHA-256',enc.encode(owner));return '_private-ai/'+[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join('')}
 async function encryptionKey(secret:string){const bytes=unb64(secret);if(bytes.length!==32)throw Error('Vault unavailable');return crypto.subtle.importKey('raw',bytes,{name:'AES-GCM'},false,['encrypt','decrypt'])}

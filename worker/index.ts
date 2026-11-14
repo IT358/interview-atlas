@@ -1,9 +1,30 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import { requestHasShareAccess, shareCookieHeader, shareEnabled, shareGateHtml, shareToken } from "../lib/share-access";
 
 const worker = {
   fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
+    if (shareEnabled(env as any) && !requestHasShareAccess(request, env as any)) {
+      const url = new URL(request.url);
+      const access = url.searchParams.get("access") || "";
+      const expected = shareToken(env as any);
+      if (access && access === expected) {
+        url.searchParams.delete("access");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: url.pathname + url.search + url.hash,
+            "Set-Cookie": shareCookieHeader(expected, url.protocol === "https:"),
+            "Cache-Control": "private, no-store",
+          },
+        });
+      }
+      return new Response(shareGateHtml(), {
+        status: 401,
+        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" },
+      });
+    }
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
     // the auxiliary service binding are absent from production builds.

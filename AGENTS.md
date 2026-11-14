@@ -21,3 +21,9 @@
 - When the server can verify enough free account credits through /usage, do not show a recurring device confirmation. When free allowance is exhausted or cannot be verified, ask on the initiating device before sending the search. Cancel sends no search; acceptance covers only the current explicit action.
 - These owner decisions supersede older Tavily requirements above for two-stage tokens, paygo_limit=0, mandatory per-action confirmations, or blanket paid-capable API locks. Preserve existing encryption, same-origin checks, request receipts, no automatic retries, and other AI cost locks. Never change plans or purchase credits automatically.
 - Preserve the owner-only audience. Local development does not deploy to Sites. Never include .dev.vars, .env, runtime state, personal records, tokens, or node_modules in a shared archive.
+
+# Latest owner decisions — 2026-11-14 (URL share + billing hold)
+
+- URL-knowers may use a shared Workers URL protected by SHARE_ACCESS_TOKEN. Do not make Sites broadly public.
+- Keep Cloudflare Workers / D1 / R2 on free tier only. Do not enable Paid plans, auto credit purchase, or other billable hosting upgrades without a separate final owner confirmation naming cost, cap, and payer.
+- When Tavily free allowance is exhausted or cannot be verified, stop the action. Do not let device confirmation authorize paid use. Show users: 「これ以降は課金が必要なので深夜特急の承認待ちです」. Resume paid-capable actions only when OWNER_BILLING_APPROVED=1 is explicitly set by the owner.

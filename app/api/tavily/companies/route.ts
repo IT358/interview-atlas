@@ -18,7 +18,7 @@ export async function POST(req:Request){
  if(conditions.region&&!companyRegions.includes(conditions.region))return reply({error:'地域を選び直してください。'},400);
  if(!companyTypes.includes(conditions.type)||!companyPurposes.includes(conditions.purpose))return reply({error:'会社の種類・探し方を選び直してください。'},400);
  const batch=Number(data.batchIndex||0);if(!Number.isInteger(batch)||batch<0||batch>46)return reply({error:'調査回数の指定が不正です。'},400);
- permit=await authorizeTavily({key:saved.key,db:env.DB,initiated:data.initiated,confirmed:data.confirmed,credits:1});
+ permit=await authorizeTavily({key:saved.key,db:env.DB,initiated:data.initiated,confirmed:data.confirmed,credits:1,env:env as any});
  const query=companyResearchQuery(conditions,batch),region=companyResearchRegion(conditions,batch);
  const r=await fetch('https://api.tavily.com/search',{method:'POST',headers:{Authorization:'Bearer '+saved.key,'Content-Type':'application/json'},body:JSON.stringify({query,search_depth:'basic',auto_parameters:false,max_results:20,include_raw_content:'text',include_answer:false,include_usage:true}),signal:AbortSignal.timeout(25000),redirect:'manual'});
  if(!r.ok)throw tavilyResponseError(r.status);

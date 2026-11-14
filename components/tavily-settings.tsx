@@ -10,8 +10,8 @@ export default function TavilySettings({onReady,onSearch}:{onReady:(saved:boolea
   <div className="section-title"><h2>Web検索の設定</h2><span className="pill">{!ready?'未確認':saved?'Tavily：設定済み':'Tavily：未設定'}</span></div>
   <p>Web全体から候補を集めるときだけ、TavilyのAPIキーを設定します。APIキーは検索サービスを使うための合いかぎです。</p>
   <ol className="setup-steps">
-   <li><b>1. Tavilyを開いてログイン</b><p>初めてなら無料アカウントを作成します。</p><a className="primary" href="https://app.tavily.com/" target="_blank" rel="noreferrer">ここを押す：Tavilyを開く ↗</a></li>
-   <li><b>2. API Keysでキーをコピー</b><p><code>tvly-</code>で始まるキーをコピーし、この画面に戻ります。</p></li>
+   <li><b>1. Tavilyを開いてログイン</b><p>初めてなら無料アカウントを作成します。下のボタンは<strong>別ウィンドウ</strong>で開きます。</p><a className="primary" href="https://app.tavily.com/" target="_blank" rel="noopener noreferrer">APIキー取得ページを別ウィンドウで開く ↗</a><p><code>https://app.tavily.com/</code></p></li>
+   <li><b>2. API Keysでキーをコピー</b><p><code>tvly-</code>で始まるキーをコピーし、この画面に戻ります。</p><a className="secondary" href="https://help.tavily.com/articles/9170796666-how-can-i-create-an-api-key" target="_blank" rel="noopener noreferrer">キーの場所ヘルプを別ウィンドウで開く ↗</a></li>
    <li><b>3. 下の欄に貼り付けて保存</b><p>スマホは長押し → 貼り付け。Macは⌘V、WindowsはCtrl＋Vです。</p></li>
   </ol>
   <label htmlFor="tavily-key">Tavily APIキー</label><input id="tavily-key" type="password" autoComplete="off" spellCheck={false} maxLength={512} disabled={busy||!ready} value={key} onChange={e=>setKey(e.target.value)} placeholder={saved?'保存済み・変更するときだけ入力':'tvly-… をここに貼り付け'}/>

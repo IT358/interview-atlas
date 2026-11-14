@@ -25,7 +25,7 @@ export async function POST(req:Request){
  const conditions={...emptySearch};for(const k of Object.keys(conditions) as (keyof typeof conditions)[])conditions[k]=String(data.conditions?.[k]||'').slice(0,300);
  if(conditions.market==='海外')return reply({error:'海外案件はAPIキー不要の複数サイト検索で探してください。'},400);
  if(conditions.source&&!['クラウドワークス','ランサーズ','ココナラ','クラウディア'].includes(conditions.source))return reply({error:'この掲載元はAPIキー不要検索または外部検索から確認してください。'},400);
- permit=await authorizeTavily({key:saved.key,db:env.DB,initiated:data.initiated,confirmed:data.confirmed,credits:2,minimumCredits:1});
+ permit=await authorizeTavily({key:saved.key,db:env.DB,initiated:data.initiated,confirmed:data.confirmed,credits:2,minimumCredits:1,env:env as any});
  const signal=AbortSignal.timeout(55000),query=websiteSearchQuery(conditions);const all:any[]=[],creditsPerBatch:number[]=[],warnings:string[]=permit.credits<2?['無料枠の残り1クレジットで基本検索を1回実行しました。追加の確認済み募集はAPIキー不要の取得で補完します。']:[];let creditsUncertain=false;
  // Two basic searches from one button action, never a retry of a failed request.
  for(let batch=0;batch<permit.credits;batch++){

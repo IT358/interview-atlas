@@ -52,3 +52,4 @@ data/*.sqlite*
 *.db
 credentials.json
 **/secrets/**
+.share-invite.local.txt
