@@ -19,7 +19,7 @@ export default function CompanyResearch({tavilyReady,onSettings,onRegister}:{tav
  const shown=rows.filter(c=>(!conditions.region||c.region===conditions.region||c.searchRegion===conditions.region)&&(!keyword||[c.company,c.services.join(' '),c.note,c.evidence].join(' ').toLowerCase().includes(keyword.toLowerCase()))&&matchesCategory({title:c.services.join(' '),description:c.evidence+' '+c.note},conditions.service)&&(!priceOnly||c.publishedOutsourcePrice));
  function keep(next:typeof campaign){setCampaign(next);try{sessionStorage.setItem('atlas-company-national-v1',JSON.stringify(next))}catch{setMessage('この端末の保存容量が足りません。CSVで結果を保存してください。')}}
  async function investigate(){
-  if(busy||!planned)return;if(!tavilyReady){setMessage('追加Web調査にはTavilyキーの設定が必要です。調査済み100件はキー不要で使えます。');return}
+  if(busy||!planned)return;if(!tavilyReady){setMessage('追加Web調査には、あなたのTavilyキーを設定に入れてください。調査済み100件はキー不要で使えます。');return}
   cancelled.current=false;const ctl=new AbortController();abort.current=ctl;setBusy(true);setProgress(0);setCredits(0);let used=0,added=0;const unique=new Map<string,any>((same?campaign.rows:[]).map(c=>[companyDomain(c.url),c]));const done=[...completed];setTab('web');setRows([...unique.values()]);
   const action={label:'制作会社の追加調査',credits:planned,details:`今回は最大${planned}回、未調査地域から続けて調べます。新規${target}社が目標です。`,confirmed:false};
   setMessage(`公式サイトを調査しています。今回は最大${planned}回・${planned}クレジット。`);

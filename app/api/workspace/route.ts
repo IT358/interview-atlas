@@ -1,6 +1,6 @@
 import {SERVER_AUDIO_STORAGE} from '../../../lib/runtime-features';
-import {readSettings,vaultOwner} from '../../../lib/key-vault';
 import {buildInterviewEvaluationPrompt} from '../../../lib/interview-evaluation';
+import {geminiKeyFromRequest,RequestApiKeyError} from '../../../lib/request-api-key';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
 import {boundedForm,objectData,BodyLimitError,byteRange} from '../../../lib/request-body';
@@ -50,10 +50,9 @@ export async function POST(req:Request){
  }
  if(action==='evaluate'){
   if(record.kind!=='session')return reply({error:'練習記録を選んでください'},400);
-  const identity=await vaultOwner(req,user.userId);const saved=(env as any).USER_KEY_ENCRYPTION_KEY&&env.DB?await readSettings(env.DB,identity,(env as any).USER_KEY_ENCRYPTION_KEY):null;
-  if(saved&&saved.consent!==true)return reply({error:'設定でGoogleへの送信内容に同意し、キーを保存してください。'},400);
-  const key=String(form.get('key')||saved?.key||'');if(!key)return reply({error:'設定でAPIキーを入力してください'},400);
-  const model=String(form.get('model')||saved?.model||'gemini-2.5-flash');if(!/^gemini-[a-z0-9.-]+$/.test(model))return reply({error:'モデル名が不正'},400);
+  let key='';let model='gemini-2.5-flash';
+  try{({key,model}=geminiKeyFromRequest({key:form.get('key'),consent:form.get('consent'),model:form.get('model')}))}
+  catch(e){if(e instanceof RequestApiKeyError)return reply({error:e.message},e.status);throw e}
   const data=JSON.parse(record.data);
   const parts:any[]=[{text:buildInterviewEvaluationPrompt({title:data.title,brief:data.brief,jobUrl:data.jobUrl,questions:data.questions,answers:data.answers,lang:data.lang,mode:data.mode})}];
   if(SERVER_AUDIO_STORAGE&&env.BUCKET){const audio=await env.BUCKET.get(user.userId+'/'+id);if(audio){const bytes=new Uint8Array(await audio.arrayBuffer());let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));parts.push({inlineData:{mimeType:audio.httpMetadata?.contentType?.split(';')[0]||'audio/webm',data:btoa(s)}})}}
