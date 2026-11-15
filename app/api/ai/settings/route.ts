@@ -1,4 +1,3 @@
-import {FREE_TEST_MODE,costLockResponse} from '../../../../lib/cost-policy';
 import {boundedJson,BodyLimitError} from '../../../../lib/request-body';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../../chatgpt-auth';
@@ -8,7 +7,7 @@ function reply(data:any,status=200,cookie=''){const headers:Record<string,string
 async function identity(req:Request){const user=await getChatGPTUser();return vaultOwner(req,user?.userId)}
 export async function GET(req:Request){try{const id=await identity(req);const secret=(env as any).USER_KEY_ENCRYPTION_KEY;if(!secret||!env.DB)return reply({error:'キー保存機能の設定が完了していません。'},503);const saved=await readSettings(env.DB,id,secret);return reply({saved:!!saved,scope:id.guest?'guest':'account',model:saved?.model||'gemini-2.5-flash',consent:saved?.consent||false,updatedAt:saved?.updatedAt||null},200,id.cookie)}catch{return reply({error:'保存済みのAI設定を読み込めませんでした。'},503)}}
 export async function POST(req:Request){
- if(FREE_TEST_MODE)return costLockResponse();
+ // Gemini面談評価用のキー保存は許可。Tavily/案件AI検索のロックは /api/ai/search 側で維持する。
  if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'不正なアクセス'},403);
  try{const data=await boundedJson(req,6000);const id=await identity(req);const secret=(env as any).USER_KEY_ENCRYPTION_KEY;if(!secret||!env.DB)return reply({error:'キー保存機能の設定が完了していません。'},503);
  const previous=await readSettings(env.DB,id,secret);const key=String(data.key||'').trim()||previous?.key;

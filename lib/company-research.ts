@@ -1,12 +1,33 @@
 import {companyDomain,companyRegions,type CompanyConditions} from './company-search';
+
+/** Hypothesis ranges backed only by estimateSources public pages. Existing 4 model ranges/scopes unchanged. */
 export const proposalModels=[
- {id:'coding5',label:'5ページ前後のコーディング',min:50000,max:150000,scope:'デザイン・原稿支給、レスポンシブ実装。取材・デザイン・有料素材・複雑な機能は含めない仮定。'},
- {id:'lp',label:'LPのコーディング1本',min:30000,max:100000,scope:'完成デザインと素材支給、PC・スマホ対応。構成・コピー・広告運用は別。'},
- {id:'wp',label:'WordPressサイト実装',min:100000,max:200000,scope:'小〜中規模サイトのデザイン構築・WordPress実装。企画や追加機能の範囲によって変動。'},
- {id:'design',label:'複数ページのWebデザイン',min:120000,max:300000,scope:'ページ数・ワイヤー支給・修正回数などを確認する前の予算仮説。'}
+ {id:'all',label:'全て（作業を問わない）',group:'全体',min:30000,max:300000,scope:'全作業の幅です。提案する作業が決まったら、種類を選ぶと予想の幅が絞れます。個別作業の前提は各候補を参照してください。'},
+ {id:'coding5',label:'5ページ前後のコーディング',group:'コーディング',min:50000,max:150000,scope:'デザイン・原稿支給、レスポンシブ実装。取材・デザイン・有料素材・複雑な機能は含めない仮定。'},
+ {id:'lp',label:'LPのコーディング1本',group:'コーディング',min:30000,max:100000,scope:'完成デザインと素材支給、PC・スマホ対応。構成・コピー・広告運用は別。'},
+ {id:'coding_page',label:'1ページの追加・部分修正',group:'コーディング',min:5000,max:30000,scope:'下層1ページ追加や部分修正の仮説。Catwork公開の下層コーディング目安（税抜5,000〜10,000円/ページ）を下限の根拠とし、修正範囲で上限を広げた幅。原稿・デザイン新規・機能追加は別。'},
+ {id:'design',label:'複数ページのWebデザイン',group:'デザイン',min:120000,max:300000,scope:'ページ数・ワイヤー支給・修正回数などを確認する前の予算仮説。'},
+ {id:'design_lp_code',label:'LPデザイン＋コーディング',group:'デザイン',min:80000,max:200000,scope:'LPのデザインと実装をまとめた仮説。シンシエイト公開のLPデザイン5〜10万円/件と、Catwork・シンシエイトのLP実装目安（3〜10万円級）を足し合わせた幅。構成・広告運用は別。'},
+ {id:'wp',label:'WordPressサイト実装',group:'WordPress・EC',min:100000,max:200000,scope:'小〜中規模サイトのデザイン構築・WordPress実装。企画や追加機能の範囲によって変動。'},
+ {id:'wp_custom',label:'WordPressの修正・カスタマイズ',group:'WordPress・EC',min:10000,max:80000,scope:'既存テーマやカスタム投稿まわりの修正仮説。Catwork公開のWPカスタマイズ目安（税抜10,000円〜/1カスタム投稿）を下限の根拠とし、範囲で上限を置いた幅。新規サイト一式や大規模改修は別。'},
+ {id:'ops_monthly',label:'サイト保守・運用（月額）',group:'運用',min:30000,max:80000,scope:'定型の更新・運用の月額仮説。峰の公開例（ECサイト運用などの定型業務：月3万円〜）を下限の根拠とし、作業量で上限を置いた幅。新規制作・大規模改修は別。'},
 ];
-export const estimateSources=[{name:'Catwork：コーディング外注価格',url:'https://catwork.co.jp/outsourcing/'},{name:'峰：登録フリーランス募集・報酬',url:'https://mine003.com/recruit/'},{name:'MEcreate：WordPress制作の委託報酬',url:'https://mecreate.co.jp/recruit/'},{name:'シンシエイト：デザイン・実装の委託報酬',url:'https://sinciate.co.jp/partner-wanted/'}];
-export function estimateNote(modelId:string){const m=proposalModels.find(m=>m.id===modelId)||proposalModels[0];return `単価予想（仮説）：${m.min.toLocaleString('ja-JP')}〜${m.max.toLocaleString('ja-JP')}円 / ${m.label}。${m.scope} 他社の公開外注例から置いた提案準備用の幅で、この会社の発注予算・あなたの受取額を確認したものではありません。税・手数料・実績要件は別途確認。`}
+
+export const estimateSources=[
+ {name:'Catwork：コーディング外注価格',url:'https://catwork.co.jp/outsourcing/'},
+ {name:'峰：登録フリーランス募集・報酬',url:'https://mine003.com/recruit/'},
+ {name:'MEcreate：WordPress制作の委託報酬',url:'https://mecreate.co.jp/recruit/'},
+ {name:'シンシエイト：デザイン・実装の委託報酬',url:'https://sinciate.co.jp/partner-wanted/'},
+];
+
+export function estimateNote(modelId:string){
+ const m=proposalModels.find(x=>x.id===modelId)||proposalModels.find(x=>x.id==='all')||proposalModels[0];
+ if(m.id==='all'){
+  return `単価予想（仮説）：${m.min.toLocaleString('ja-JP')}〜${m.max.toLocaleString('ja-JP')}円 / ${m.label}。${m.scope} 他社の公開外注例から置いた提案準備用の全体幅で、この会社の発注予算・あなたの受取額を確認したものではありません。税・手数料・実績要件は別途確認。`;
+ }
+ return `単価予想（仮説）：${m.min.toLocaleString('ja-JP')}〜${m.max.toLocaleString('ja-JP')}円 / ${m.label}。${m.scope} 他社の公開外注例から置いた提案準備用の幅で、この会社の発注予算・あなたの受取額を確認したものではありません。税・手数料・実績要件は別途確認。`;
+}
+
 export function companyResearchRegion(c:CompanyConditions,index:number){return c.region||companyRegions[index%companyRegions.length]}
 export function companyResearchQuery(c:CompanyConditions,index:number){
  const variants=c.purpose==='制作会社全般'?['会社概要 ホームページ制作','事業内容 Webデザイン','制作実績 WordPress','Web制作 コーディング']:['制作パートナー募集 コーダー','外注パートナー WordPress','協力会社募集 Webデザイン','フリーランス 募集 コーディング','業務委託 パートナー募集','ホームページ制作 外部スタッフ募集','HTML CSS 制作パートナー','LP制作 協力パートナー','Web制作 業務提携募集','サイト運用 保守 パートナー募集'];
