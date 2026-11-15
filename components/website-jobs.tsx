@@ -109,7 +109,7 @@ export default function WebsiteJobs({tavilyReady,onSettings,onSave}:{tavilyReady
   if(mode==='researched'&&!refresh){setApplied({...conditions});setAppliedMode(mode);setDiagnostics(null);setMessage(`いま持っている結果から ${filterWebsiteJobs(catalog,conditions).length}件が条件に合います。新しい募集は「かんたん検索」で探してください。`);showResults();return}
   // Drain deferred overflow first — display-cap holdback, not exclusions. No API cost.
   if(loadMore&&overflow.length){
-   const promote=overflow.slice(0,30),rest=overflow.slice(30);
+   const promote=overflow.slice(0,100),rest=overflow.slice(100);
    const merged=mergeUnique(jobs,promote);setJobs(merged);setOverflow(rest);
    const saved=mergeUnique(catalog,merged).slice(-1000);setCatalog(saved);
    const totals=sessionTotals(saved,conditions,rest);
@@ -165,7 +165,7 @@ export default function WebsiteJobs({tavilyReady,onSettings,onSave}:{tavilyReady
   </fieldset></form>
   </div>
   <div className={'search-status'+(busy?' is-busy':'')}><ShieldCheck size={17}/><p className="search-feedback" role="status">{message}</p></div>
-  <div className="results-toolbar" id="website-results"><div><span className="tiny-label">けんさく結果</span><h2>{scopeLabel(applied.cat)}<strong>{shown.length}</strong><small>件</small></h2></div><select aria-label="並べ替え" value={applied.sort} onChange={e=>setApplied(c=>({...c,sort:e.target.value}))}><option value="new">新しい順</option><option value="deadline">期限が近い順</option><option value="salary">報酬が高い順</option></select></div>
+  <div className="results-toolbar" id="website-results"><div><span className="tiny-label">けんさく結果</span><h2>{scopeLabel(applied.cat)}<strong>{shown.length}</strong><small>件</small></h2></div><select className="field-compact" aria-label="並べ替え" value={applied.sort} onChange={e=>setApplied(c=>({...c,sort:e.target.value}))}><option value="new">新しい順</option><option value="deadline">期限が近い順</option><option value="salary">報酬が高い順</option></select></div>
   <div className="result-summary-bar" aria-label="結果のまとめ">
    <div className="result-summary-main"><span>表示中 <b>{shown.length}</b>件</span>{overflow.length>0&&<span>まだ見ていない <b>{overflow.length}</b>件</span>}{creditsSpent>0&&<span className="credit-note">追加検索 <b>{creditsSpent}</b>クレジット使用</span>}{typeof freeBefore==='number'&&<span className="credit-note">無料残量（検索前） <b>{freeBefore.toLocaleString('ja-JP')}</b></span>}</div>
    <div className="result-context tight"><p>{[applied.market||'日本・海外',applied.source||'複数サイト',applied.q&&'「'+applied.q+'」'].filter(Boolean).join(' / ')}{dirty&&<b>上の条件はまだ反映されていません</b>}</p><button type="button" className="text-button" disabled={busy} onClick={()=>load(true)}>内容を更新<RotateCcw size={13}/></button></div>
@@ -189,7 +189,7 @@ export default function WebsiteJobs({tavilyReady,onSettings,onSave}:{tavilyReady
   <div className="results-footnote">
    <details className="tech-stats"><summary>くわしい検索の内訳（必要なときだけ）</summary>
    {(appliedMode==='web'||appliedMode==='live')&&diagnostics&&<div className="result-source-counts tech" aria-label="くわしい統計"><span>取得候補<b>{String(diagnostics.scanned??0)}</b></span><span>本文確認<b>{String(diagnostics.verified??diagnostics.stats?.verified??0)}</b></span><span>条件一致<b>{String(diagnostics.matched??diagnostics.stats?.matched??shown.length)}</b></span><span>重複除外<b>{String(diagnostics.duplicatesExcluded??0)}</b></span><span>条件不一致<b>{String(diagnostics.filterMismatched??0)}</b></span><span>今回の新規<b>{String(diagnostics.batchDisplayed??0)}</b></span><span>保存中<b>{String(catalog.length)}</b></span><span>累計API<b>{String(creditsSpent)}</b></span></div>}
-   <p>1回あたり最大30件を表示します。それ以上は「ほかの案件も見る」で続きを出せます。同じタブなら再読み込み後も結果が残ります。ブラウザを閉じると消えます。</p>
+   <p>1回あたり最大100件を表示します。それ以上は「ほかの案件も見る」で続きを出せます。同じタブなら再読み込み後も結果が残ります。ブラウザを閉じると消えます。</p>
    {diagnostics?.sourceDiagnostics?.length>0&&<details><summary>サイト別の診断</summary><ul>{diagnostics.sourceDiagnostics.map((s:any,i:number)=><li key={i}>{s.sourceFocus}／{s.label}：返却 {s.tavilyReturned??0} · 個別URL {s.detailCandidates??0} · 確認 {s.detailVerified??0} · 不一致 {s.filterMismatched??0} · 重複 {s.duplicates??0} · 消費 {s.credits??0}</li>)}</ul></details>}
    {diagnostics?.queries?.length>0&&<details><summary>使った検索語句</summary><ul>{diagnostics.queries.map((q:any,i:number)=><li key={i}>{q.label}（{q.sourceFocus}{q.domains?.length?` / ${q.domains.join(',')}`:''}）<br/><small>{q.query}</small></li>)}</ul></details>}
    {diagnostics?.discoveryChecks?.length>0&&<details><summary>取得元の確認</summary><ul>{diagnostics.discoveryChecks.map((c:any)=><li key={c.source}>{c.source}：{c.reason||`${c.verified??c.candidates}件を確認`}</li>)}</ul></details>}

@@ -51,14 +51,14 @@ async function coconalaUrls(c:Partial<SearchConditions>,bucket?:R2Bucket,signal?
  }));return [...new Set(urls.flat())].slice(0,20);
 }
 /** Round-robin unique merge, then split display vs deferred overflow (not exclusions). */
-export function balancedJobs(groups:WebsiteJob[][],c:Partial<SearchConditions>,target=30,skip=new Set<string>()){
+export function balancedJobs(groups:WebsiteJob[][],c:Partial<SearchConditions>,target=100,skip=new Set<string>()){
  const filtered=groups.map(rows=>filterWebsiteJobs(rows,c).filter(j=>!skip.has(j.url)));
  const found=new Map<string,WebsiteJob>();const ordered:WebsiteJob[]=[];let i=0;
  while(filtered.some(rows=>rows.length>i)){for(const rows of filtered){const j=rows[i];if(j&&!found.has(j.url)){found.set(j.url,j);ordered.push(j)}}i++}
  // Keep round-robin order for the display/overflow split (do not re-sort here).
  return {valid:ordered,jobs:ordered.slice(0,target),overflow:ordered.slice(target)};
 }
-export async function collectWebsiteJobs(c:Partial<SearchConditions>,bucket?:R2Bucket,signal?:AbortSignal,seeds:WebsiteJob[]=[],target=30,force=false,excludeUrls:string[]=[]){
+export async function collectWebsiteJobs(c:Partial<SearchConditions>,bucket?:R2Bucket,signal?:AbortSignal,seeds:WebsiteJob[]=[],target=100,force=false,excludeUrls:string[]=[]){
  const checks:SourceCheck[]=[],tasks:Promise<WebsiteJob[]>[]=[];const deadUrls=new Set<string>();const skip=new Set(excludeUrls.map(u=>jobDetailUrl(u)||u).filter(Boolean));
  let scanned=0,verifiedCount=0,exclusionCounts:Record<string,number>={};
  const recordExclusions=(r:{checks:{url:string;reason?:string}[]})=>{for(const check of r.checks){if(check.reason)exclusionCounts[check.reason]=(exclusionCounts[check.reason]||0)+1;if(['応募期限切れ','募集終了・受付停止','対象職種の依頼ではない','Webサイト制作の依頼ではない'].includes(check.reason||''))deadUrls.add(check.url)}};
@@ -71,7 +71,7 @@ export async function collectWebsiteJobs(c:Partial<SearchConditions>,bucket?:R2B
  if(allowed('Freelancer.com','海外'))tasks.push((async()=>{try{const r=await fetchFreelancerProjects(bucket,signal,c);const fresh=r.jobs.filter((j:WebsiteJob)=>!skip.has(j.url));scanned+=r.scanned;verifiedCount+=fresh.length;checks.push({source:'Freelancer.com',status:200,candidates:r.scanned,verified:fresh.length});return fresh}catch{checks.push({source:'Freelancer.com',status:null,candidates:0,reason:'公式APIに接続できない'});return []}})());
  const groups=await Promise.all(tasks);let split=balancedJobs(groups,c,target,skip),catalogFallback=false;
  if(split.jobs.length<target){
-  const candidates=filterWebsiteJobs(seeds,c).filter(j=>!deadUrls.has(j.url)&&!skip.has(j.url)&&!split.valid.some(v=>v.url===j.url)).slice(0,30);
+  const candidates=filterWebsiteJobs(seeds,c).filter(j=>!deadUrls.has(j.url)&&!skip.has(j.url)&&!split.valid.some(v=>v.url===j.url)).slice(0,Math.max(0,target-split.jobs.length));
   if(candidates.length){const verified=await verifyJobUrls(candidates.map(j=>j.url),bucket,false,candidates,signal);verifiedCount+=verified.jobs.length;recordExclusions(verified);const previous=verified.jobs.filter((j:WebsiteJob)=>!deadUrls.has(j.url)&&!skip.has(j.url)).map((j:WebsiteJob)=>({...j,verification:'前回の本文確認を利用（今回の接続は未確認）'}));if(previous.length){split=balancedJobs([split.valid,previous],c,target,skip);catalogFallback=true}}
  }
  const filterMismatched=Math.max(0,verifiedCount-split.valid.length);

@@ -1,9 +1,11 @@
 import {companyDomain,companyRegions,type CompanyConditions} from './company-search';
 
-/** Hypothesis ranges backed only by estimateSources public pages. Existing 4 model ranges/scopes unchanged. */
-export const proposalModels=[
- {id:'all',label:'全て（作業を問わない）',group:'全体',min:30000,max:300000,scope:'全作業の幅です。提案する作業が決まったら、種類を選ぶと予想の幅が絞れます。個別作業の前提は各候補を参照してください。'},
+/** Hypothesis ranges backed only by estimateSources public pages. Existing non-all model ranges/scopes unchanged. */
+const workProposalModels=[
  {id:'coding5',label:'5ページ前後のコーディング',group:'コーディング',min:50000,max:150000,scope:'デザイン・原稿支給、レスポンシブ実装。取材・デザイン・有料素材・複雑な機能は含めない仮定。'},
+ // Catwork 下層コーディング税抜5,000〜10,000円/ページ × ページ数（トップも同単価帯で仮置き。割増の出典なし）
+ {id:'coding10',label:'10ページ前後のコーディング',group:'コーディング',min:50000,max:100000,scope:'Catwork公開の下層コーディング目安（税抜5,000〜10,000円/ページ）×約10ページで機械的に置いた仮説。トップページ分も同単価帯で仮置き（下層単価×ページ数）。デザイン・原稿支給・レスポンシブ実装を想定。取材・デザイン新規・有料素材・複雑な機能は含めない。'},
+ {id:'coding20',label:'20ページ以上のサイト制作（コーディング）',group:'コーディング',min:100000,max:200000,scope:'Catwork公開の下層コーディング目安（税抜5,000〜10,000円/ページ）×20ページで機械的に置いた仮説（20ページ以上の下限イメージ）。トップページ分も同単価帯で仮置き（下層単価×ページ数）。デザイン・原稿支給・レスポンシブ実装を想定。取材・デザイン新規・有料素材・複雑な機能は含めない。'},
  {id:'lp',label:'LPのコーディング1本',group:'コーディング',min:30000,max:100000,scope:'完成デザインと素材支給、PC・スマホ対応。構成・コピー・広告運用は別。'},
  {id:'coding_page',label:'1ページの追加・部分修正',group:'コーディング',min:5000,max:30000,scope:'下層1ページ追加や部分修正の仮説。Catwork公開の下層コーディング目安（税抜5,000〜10,000円/ページ）を下限の根拠とし、修正範囲で上限を広げた幅。原稿・デザイン新規・機能追加は別。'},
  {id:'design',label:'複数ページのWebデザイン',group:'デザイン',min:120000,max:300000,scope:'ページ数・ワイヤー支給・修正回数などを確認する前の予算仮説。'},
@@ -11,6 +13,12 @@ export const proposalModels=[
  {id:'wp',label:'WordPressサイト実装',group:'WordPress・EC',min:100000,max:200000,scope:'小〜中規模サイトのデザイン構築・WordPress実装。企画や追加機能の範囲によって変動。'},
  {id:'wp_custom',label:'WordPressの修正・カスタマイズ',group:'WordPress・EC',min:10000,max:80000,scope:'既存テーマやカスタム投稿まわりの修正仮説。Catwork公開のWPカスタマイズ目安（税抜10,000円〜/1カスタム投稿）を下限の根拠とし、範囲で上限を置いた幅。新規サイト一式や大規模改修は別。'},
  {id:'ops_monthly',label:'サイト保守・運用（月額）',group:'運用',min:30000,max:80000,scope:'定型の更新・運用の月額仮説。峰の公開例（ECサイト運用などの定型業務：月3万円〜）を下限の根拠とし、作業量で上限を置いた幅。新規制作・大規模改修は別。'},
+];
+const allMin=Math.min(...workProposalModels.map(m=>m.min));
+const allMax=Math.max(...workProposalModels.map(m=>m.max));
+export const proposalModels=[
+ {id:'all',label:'全て（作業を問わない）',group:'全体',min:allMin,max:allMax,scope:`全作業の幅です（各候補の最小 ${allMin.toLocaleString('ja-JP')}円〜最大 ${allMax.toLocaleString('ja-JP')}円から再計算）。提案する作業が決まったら、種類を選ぶと予想の幅が絞れます。個別作業の前提は各候補を参照してください。`},
+ ...workProposalModels,
 ];
 
 export const estimateSources=[

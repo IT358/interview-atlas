@@ -31,12 +31,13 @@ const job=(id,source='クラウドワークス')=>{
 };
 
 // 1) Additive Tavily mock merge keeps prior valid jobs (34→ stay ≥34 when batch adds few).
+// Display cap is 100: a 34-job prior batch is shown in full (no holdback).
 const prior=Array.from({length:34},(_,i)=>job(1000+i,i%3===0?'ココナラ':'クラウドワークス'));
 const novel=[job(9001,'ランサーズ'),job(1001)]; // 1001 duplicate of prior
 const {merged,saved}=session.mergeSearchBatch({
  additive:true,
  catalog:prior,
- jobs:prior.slice(0,30),
+ jobs:prior.slice(0,100),
  next:novel,
  overflow:[],
  held:[job(9002,'クラウディア')],
@@ -47,6 +48,10 @@ assert.ok(merged.some(j=>j.source==='ランサーズ'));
 assert.equal(saved.length,36); // +held overflow unique
 const totals=session.sessionMatchTotals(saved,{cat:'Web制作全般'},[]);
 assert.equal(totals.matched,36);
+// Display-cap holdback: with >100 matches, first response keeps at most 100 visible.
+const many=Array.from({length:120},(_,i)=>job(3000+i,i%2===0?'ココナラ':'クラウドワークス'));
+assert.equal(many.slice(0,100).length,100);
+assert.equal(many.slice(100).length,20);
 
 // 2) New discover replaces; does not keep unrelated catalog rows.
 const replaced=session.mergeSearchBatch({

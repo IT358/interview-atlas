@@ -12,7 +12,8 @@ import {websiteSearchPlans,verifyTavilyWebsiteResults} from '../../../lib/websit
 import {combineRequestStats} from '../../../lib/website-job-session';
 export const dynamic='force-dynamic';
 const reply=(d:any,status=200)=>Response.json(d,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
-const BATCH_TARGET=30;
+/** Max jobs shown in one response batch; remainder goes to overflow (display cap only). */
+const BATCH_TARGET=100;
 type PlanDiag={sourceFocus:string;label:string;query:string;include_domains:string[];tavilyReturned:number;detailCandidates:number;detailVerified:number;filterMismatched:number;duplicates:number;credits:number};
 function parseExclude(raw:unknown){
  if(Array.isArray(raw))return raw.map(u=>jobDetailUrl(String(u||''))).filter(Boolean).slice(0,1000);
