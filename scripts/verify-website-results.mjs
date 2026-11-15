@@ -22,5 +22,6 @@ const row=(id,status='released',expired_on=future)=>({job_offer:{id,status,expir
 const data=JSON.stringify({searchResult:{job_offers:[row(12345),row(12346,'closed'),row(12347,'released','2000-01-01'),row('12348')]}}).replaceAll('"','&quot;');
 assert.equal(search.urlsFromOfficialListing(`<div id="vue-container" data="${data}"></div>`).length,1);
 assert.equal(search.urlsFromOfficialListing('<p>No public listings</p>').length,0);
-assert(search.websiteSearchQuery({cat:'Web制作全般'}).includes('site:crowdworks.jp/public/jobs/'));assert(!search.websiteSearchQuery({cat:'Web制作全般'}).includes('フリーランス 業務委託 案件'));
+assert(search.websiteSearchQuery({cat:'Web制作全般'}).includes('inurl:/public/jobs/'));assert(!search.websiteSearchQuery({cat:'Web制作全般'}).includes('site:crowdworks.jp'));assert(!search.websiteSearchQuery({cat:'Web制作全般'}).includes('フリーランス 業務委託 案件'));
+const plan=search.websiteSearchPlans({cat:'Web制作全般',source:'クラウドワークス'},1,0)[0];assert.deepEqual(plan.domains,['crowdworks.jp']);assert(plan.query.includes('ホームページ制作'));assert(!plan.query.includes('site:'));
 console.log('Website result checks passed: HP修正 and nested titles, date formats, complete-text filtering, raw-content recovery, hard closed exclusions, listing/service rejection and official listing candidate validation.');

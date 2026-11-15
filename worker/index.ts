@@ -1,15 +1,16 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
-import { requestHasShareAccess, shareCookieHeader, shareGateActive, shareGateHtml, shareToken } from "../lib/share-access";
+import { requestHasShareAccess, requestHasValidShareQuery, shareCookieHeader, shareGateActive, shareGateHtml, shareToken } from "../lib/share-access";
+import { isStaticAssetPath } from "../lib/static-asset-path";
 
 const worker = {
-  fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
-    if (shareGateActive(env as any) && !requestHasShareAccess(request, env as any)) {
+  async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
+    if (shareGateActive(env as any)) {
       const url = new URL(request.url);
-      const access = url.searchParams.get("access") || "";
       const expected = shareToken(env as any);
-      if (expected && access && access === expected) {
+      // Always exchange a valid ?access= token for an HttpOnly cookie, then drop it from the URL.
+      if (requestHasValidShareQuery(request, env as any) && expected) {
         url.searchParams.delete("access");
         return new Response(null, {
           status: 302,
@@ -20,11 +21,22 @@ const worker = {
           },
         });
       }
-      return new Response(shareGateHtml(), {
-        status: 401,
-        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" },
-      });
+      if (!requestHasShareAccess(request, env as any)) {
+        return new Response(shareGateHtml(), {
+          status: 401,
+          headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" },
+        });
+      }
     }
+
+    // Only static files go to ASSETS. Calling ASSETS for /api/* or SSR routes can
+    // return HTML (non-404) and break JSON clients with "Unexpected token '<'".
+    const pathname = new URL(request.url).pathname;
+    if (env.ASSETS && isStaticAssetPath(pathname)) {
+      const assetResponse = await env.ASSETS.fetch(request);
+      if (assetResponse.status !== 404) return assetResponse;
+    }
+
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
     // the auxiliary service binding are absent from production builds.

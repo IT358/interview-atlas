@@ -7,6 +7,12 @@ export function shareGateActive(env?:{SHARE_ACCESS_TOKEN?:string}|null){
  if(import.meta.env.PROD)return true;
  return shareEnabled(env);
 }
+export function requestHasValidShareQuery(req:Request,env?:{SHARE_ACCESS_TOKEN?:string}|null){
+ const expected=shareToken(env);
+ if(!expected||expected.length<16)return false;
+ const query=new URL(req.url).searchParams.get('access')||'';
+ return timingSafeEqual(query,expected);
+}
 export function requestHasShareAccess(req:Request,env?:{SHARE_ACCESS_TOKEN?:string}|null){
  const expected=shareToken(env);
  if(!expected||expected.length<16)return false;

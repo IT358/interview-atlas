@@ -2,7 +2,7 @@
 import TavilyConnectGuide from './tavily-connect-guide';
 export default function ServiceAccessGuide({service,onTavilyReady,onGoJobs}:{service:'tavily'|'gemini';onTavilyReady?:(saved:boolean,consent:boolean)=>void;onGoJobs?:()=>void}){
  const search=service==='tavily';
- if(search)return <section className="panel service-access-guide" aria-label="追加Web調査の利用案内"><p>Tavilyは検索・実行ボタンを押したときだけ送信します。月1,000クレジットの無料残量が足りる間は確認なし、不足・残量不明の場合だけこの端末で確認します。</p><TavilyConnectGuide onReady={onTavilyReady} onGoJobs={onGoJobs}/><div className="actions"><a href="https://app.tavily.com/" target="_blank" rel="noreferrer">Tavilyの料金・残量 ↗</a><a href="https://docs.tavily.com/documentation/api-credits" target="_blank" rel="noreferrer">公式：クレジットの説明 ↗</a></div></section>;
+ if(search)return <section className="panel service-access-guide" aria-label="追加Web調査の利用案内"><TavilyConnectGuide onReady={onTavilyReady} onGoJobs={onGoJobs}/><div className="actions"><a href="https://app.tavily.com/" target="_blank" rel="noreferrer">料金・残量 ↗</a><a href="https://docs.tavily.com/documentation/api-credits" target="_blank" rel="noreferrer">クレジット説明 ↗</a></div></section>;
  return <section className="panel service-access-guide" aria-label={search?'追加Web調査の利用案内':'AI評価の利用案内'}>
  <span className="pill">利用前の確認</span><h2>{search?'追加Web調査を使うには':'AI評価を使うには'}</h2>
  <p>{search?'この先はTavilyの検索APIを使用します。':'この先はGoogleのGemini APIを使用します。'}ChatGPTの月額料金とは別のサービスです。</p>

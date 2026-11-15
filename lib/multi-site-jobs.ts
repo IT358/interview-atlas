@@ -50,24 +50,51 @@ async function coconalaUrls(c:Partial<SearchConditions>,bucket?:R2Bucket,signal?
  if(bucket&&found.length){try{await bucket.put(key,JSON.stringify({checkedAt:Date.now(),urls:found}))}catch{}}return found;
  }));return [...new Set(urls.flat())].slice(0,20);
 }
-export function balancedJobs(groups:WebsiteJob[][],c:Partial<SearchConditions>,target=30){
- const filtered=groups.map(rows=>filterWebsiteJobs(rows,c));const found=new Map<string,WebsiteJob>();let i=0;
- while(found.size<target&&filtered.some(rows=>rows.length>i)){for(const rows of filtered){const j=rows[i];if(j&&!found.has(j.url)&&found.size<target)found.set(j.url,j)}i++}
- return filterWebsiteJobs([...found.values()],c);
+/** Round-robin unique merge, then split display vs deferred overflow (not exclusions). */
+export function balancedJobs(groups:WebsiteJob[][],c:Partial<SearchConditions>,target=30,skip=new Set<string>()){
+ const filtered=groups.map(rows=>filterWebsiteJobs(rows,c).filter(j=>!skip.has(j.url)));
+ const found=new Map<string,WebsiteJob>();const ordered:WebsiteJob[]=[];let i=0;
+ while(filtered.some(rows=>rows.length>i)){for(const rows of filtered){const j=rows[i];if(j&&!found.has(j.url)){found.set(j.url,j);ordered.push(j)}}i++}
+ // Keep round-robin order for the display/overflow split (do not re-sort here).
+ return {valid:ordered,jobs:ordered.slice(0,target),overflow:ordered.slice(target)};
 }
-export async function collectWebsiteJobs(c:Partial<SearchConditions>,bucket?:R2Bucket,signal?:AbortSignal,seeds:WebsiteJob[]=[],target=30,force=false){
- const checks:SourceCheck[]=[],tasks:Promise<WebsiteJob[]>[]=[];const excludedUrls=new Set<string>();let scanned=0;
- const recordExclusions=(r:{checks:{url:string;reason?:string}[]})=>{for(const check of r.checks)if(['応募期限切れ','募集終了・受付停止','対象職種の依頼ではない','Webサイト制作の依頼ではない'].includes(check.reason||''))excludedUrls.add(check.url)};
+export async function collectWebsiteJobs(c:Partial<SearchConditions>,bucket?:R2Bucket,signal?:AbortSignal,seeds:WebsiteJob[]=[],target=30,force=false,excludeUrls:string[]=[]){
+ const checks:SourceCheck[]=[],tasks:Promise<WebsiteJob[]>[]=[];const deadUrls=new Set<string>();const skip=new Set(excludeUrls.map(u=>jobDetailUrl(u)||u).filter(Boolean));
+ let scanned=0,verifiedCount=0,exclusionCounts:Record<string,number>={};
+ const recordExclusions=(r:{checks:{url:string;reason?:string}[]})=>{for(const check of r.checks){if(check.reason)exclusionCounts[check.reason]=(exclusionCounts[check.reason]||0)+1;if(['応募期限切れ','募集終了・受付停止','対象職種の依頼ではない','Webサイト制作の依頼ではない'].includes(check.reason||''))deadUrls.add(check.url)}};
  const allowed=(name:string,market:string)=>(!c.source||c.source===name)&&(!c.market||c.market===market);
- if(allowed('クラウドワークス','日本'))tasks.push((async()=>{try{const urls=await discoverOfficialWebsiteUrls(c,bucket,signal);scanned+=urls.length;const r=await verifyJobUrls(urls,bucket,force,seeds,signal);recordExclusions(r);checks.push({source:'クラウドワークス',status:200,candidates:urls.length,verified:r.jobs.length,reason:r.jobs.length?undefined:'条件に合う個別募集を確認できない'});return r.jobs}catch{checks.push({source:'クラウドワークス',status:null,candidates:0,reason:'募集元に接続できない'});return []}})());
- if(allowed('ココナラ','日本'))tasks.push((async()=>{try{const urls=await coconalaUrls(c,bucket,signal);scanned+=urls.length;const r=await verifyJobUrls(urls,bucket,force,seeds,signal);recordExclusions(r);checks.push({source:'ココナラ',status:200,candidates:urls.length,verified:r.jobs.length,reason:r.jobs.length?undefined:'条件に合う個別募集を確認できない'});return r.jobs}catch{checks.push({source:'ココナラ',status:null,candidates:0,reason:'募集元に接続できない'});return []}})());
- if(allowed('クラウディア','日本'))tasks.push((async()=>{try{const urls=await craudiaUrls(c,bucket,signal);scanned+=urls.length;const r=await verifyJobUrls(urls,bucket,force,seeds,signal);recordExclusions(r);checks.push({source:'クラウディア',status:200,candidates:urls.length,verified:r.jobs.length,reason:r.jobs.length?undefined:'条件に合う個別募集を確認できない'});return r.jobs}catch{checks.push({source:'クラウディア',status:null,candidates:0,reason:'募集元に接続できない'});return []}})());
- if(allowed('Freelancer.com','海外'))tasks.push((async()=>{try{const r=await fetchFreelancerProjects(bucket,signal,c);scanned+=r.scanned;checks.push({source:'Freelancer.com',status:200,candidates:r.scanned,verified:r.jobs.length});return r.jobs}catch{checks.push({source:'Freelancer.com',status:null,candidates:0,reason:'公式APIに接続できない'});return []}})());
- const groups=await Promise.all(tasks);let jobs=balancedJobs(groups,c,target),catalogFallback=false;
- if(jobs.length<target){
-  const candidates=filterWebsiteJobs(seeds,c).filter(j=>!excludedUrls.has(j.url)&&!jobs.some(v=>v.url===j.url)).slice(0,30);
-  if(candidates.length){const verified=await verifyJobUrls(candidates.map(j=>j.url),bucket,false,candidates,signal);recordExclusions(verified);const previous=verified.jobs.filter(j=>!excludedUrls.has(j.url)).map(j=>({...j,verification:'前回の本文確認を利用（今回の接続は未確認）'}));if(previous.length){jobs=balancedJobs([jobs,previous],c,target);catalogFallback=true}}
+ if(allowed('クラウドワークス','日本'))tasks.push((async()=>{try{const urls=(await discoverOfficialWebsiteUrls(c,bucket,signal)).filter(u=>!skip.has(u));scanned+=urls.length;const r=await verifyJobUrls(urls,bucket,force,seeds,signal);verifiedCount+=r.jobs.length;recordExclusions(r);checks.push({source:'クラウドワークス',status:200,candidates:urls.length,verified:r.jobs.length,reason:r.jobs.length?undefined:'条件に合う個別募集を確認できない'});return r.jobs}catch{checks.push({source:'クラウドワークス',status:null,candidates:0,reason:'募集元に接続できない'});return []}})());
+ if(allowed('ココナラ','日本'))tasks.push((async()=>{try{const urls=(await coconalaUrls(c,bucket,signal)).filter(u=>!skip.has(u));scanned+=urls.length;const r=await verifyJobUrls(urls,bucket,force,seeds,signal);verifiedCount+=r.jobs.length;recordExclusions(r);checks.push({source:'ココナラ',status:200,candidates:urls.length,verified:r.jobs.length,reason:r.jobs.length?undefined:'条件に合う個別募集を確認できない'});return r.jobs}catch{checks.push({source:'ココナラ',status:null,candidates:0,reason:'募集元に接続できない'});return []}})());
+ if(allowed('クラウディア','日本'))tasks.push((async()=>{try{const urls=(await craudiaUrls(c,bucket,signal)).filter(u=>!skip.has(u));scanned+=urls.length;const r=await verifyJobUrls(urls,bucket,force,seeds,signal);verifiedCount+=r.jobs.length;recordExclusions(r);checks.push({source:'クラウディア',status:200,candidates:urls.length,verified:r.jobs.length,reason:r.jobs.length?undefined:'条件に合う個別募集を確認できない'});return r.jobs}catch{checks.push({source:'クラウディア',status:null,candidates:0,reason:'募集元に接続できない'});return []}})());
+ // ランサーズは公式一覧スクレイプ経路なし（追加の外部呼び出しを増やさない）。Tavily追加検索または調査済み補完のみ。
+ if(allowed('ランサーズ','日本')&&!c.source)checks.push({source:'ランサーズ',status:null,candidates:0,verified:0,reason:'APIキー不要経路では個別一覧を取得しません（Tavily追加検索で確認）'});
+ if(allowed('Freelancer.com','海外'))tasks.push((async()=>{try{const r=await fetchFreelancerProjects(bucket,signal,c);const fresh=r.jobs.filter((j:WebsiteJob)=>!skip.has(j.url));scanned+=r.scanned;verifiedCount+=fresh.length;checks.push({source:'Freelancer.com',status:200,candidates:r.scanned,verified:fresh.length});return fresh}catch{checks.push({source:'Freelancer.com',status:null,candidates:0,reason:'公式APIに接続できない'});return []}})());
+ const groups=await Promise.all(tasks);let split=balancedJobs(groups,c,target,skip),catalogFallback=false;
+ if(split.jobs.length<target){
+  const candidates=filterWebsiteJobs(seeds,c).filter(j=>!deadUrls.has(j.url)&&!skip.has(j.url)&&!split.valid.some(v=>v.url===j.url)).slice(0,30);
+  if(candidates.length){const verified=await verifyJobUrls(candidates.map(j=>j.url),bucket,false,candidates,signal);verifiedCount+=verified.jobs.length;recordExclusions(verified);const previous=verified.jobs.filter((j:WebsiteJob)=>!deadUrls.has(j.url)&&!skip.has(j.url)).map((j:WebsiteJob)=>({...j,verification:'前回の本文確認を利用（今回の接続は未確認）'}));if(previous.length){split=balancedJobs([split.valid,previous],c,target,skip);catalogFallback=true}}
  }
-
- return {jobs,scanned,excludedUrls:[...excludedUrls],discoveryChecks:checks,checkedAt:Date.now(),credits:0,catalogFallback,target,source:catalogFallback?'複数サイト検索（直近の本文確認結果を補完）':'複数サイトの個別募集・公式APIを確認',sourceCounts:Object.fromEntries([...new Set(jobs.map(j=>j.source))].map(source=>[source,jobs.filter(j=>j.source===source).length]))};
+ const filterMismatched=Math.max(0,verifiedCount-split.valid.length);
+ const duplicatesExcluded=exclusionCounts['重複した募集']||0;
+ return {
+  jobs:split.jobs,
+  overflow:split.overflow,
+  valid:split.valid,
+  scanned,
+  verified:verifiedCount,
+  matched:split.valid.length,
+  displayed:split.jobs.length,
+  deferred:split.overflow.length,
+  duplicatesExcluded,
+  filterMismatched,
+  exclusionCounts,
+  excludedUrls:[...deadUrls],
+  discoveryChecks:checks,
+  checkedAt:Date.now(),
+  credits:0,
+  catalogFallback,
+  target,
+  source:catalogFallback?'複数サイト検索（直近の本文確認結果を補完）':'複数サイトの個別募集・公式APIを確認',
+  sourceCounts:Object.fromEntries([...new Set(split.jobs.map(j=>j.source))].map(source=>[source,split.jobs.filter(j=>j.source===source).length])),
+ };
 }
